@@ -68,7 +68,12 @@
                 // 최단 경로
                 const digimonPath = findPath(digimonList, digimonName1, digimonName2, agentLevel);
 
-                document.getElementById("digimon-path").text = digimonPath.join(" -> ");
+                if(digimonPath === null) {
+                    document.getElementById("digimon-path").text = "경로를 찾을 수 없습니다.";
+                }
+                else {
+                    document.getElementById("digimon-path").text = digimonPath.join(" -> ");
+                }
             })
 
             // 초기화 클릭 시
@@ -162,7 +167,7 @@
                         if (levelExceptions.hasOwnProperty(neighbor)) {
                             requiredLevel = levelExceptions[neighbor];
                         } else {
-                            requiredLevel = levelRequirements[neighborInfo.level] || 1; // 기본값 1
+                            requiredLevel = levelRequirements[neighborInfo.level] || 1;
                         }
 
                         if (agentLevel >= requiredLevel) {
