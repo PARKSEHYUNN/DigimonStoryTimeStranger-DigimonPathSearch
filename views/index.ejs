@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digimon Story Time Stranger - Digimon Root Search</title>
+</head>
+<body>
+    <h2>Digimon Story Time Stranger - Digimon Root Search</h2>
+
+    <select id="agent-level-select">
+        <option value="1">1레벨</option>
+        <option value="2">2레벨</option>
+        <option value="3">3레벨</option>
+        <option value="4">4레벨</option>
+        <option value="5">5레벨</option>
+        <option value="6">6레벨</option>
+        <option value="7">7레벨</option>
+        <option value="8">8레벨</option>
+        <option value="9">9레벨</option>
+        <option value="10" selected>10레벨</option>
+    </select>
+
+    <input list="digimon-list" id="digimon-choice-1" />
+    <a>-></a>
+    <input list="digimon-list" id="digimon-choice-2" />
+    <input type="button" id="digimon-submit" value="검색" />
+    <input type="button" id="digimon-reset" value="초기화" />
+    <input type="checkbox" id="short-root" checked disabled/> <label for="short-root">짧은 경로만 탐색</label>
+
+    <br/>
+    <br/>
+    <a id="digimon-path"></a>
+
+    <datalist id="digimon-list"></datalist>
+
+    <script>
+        let digimonList = [];
+
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch("digimon.json")
+                .then(res => res.json())
+                .then(data => {
+                    digimonList = data;
+                    const dataList = document.getElementById("digimon-list");
+                    data.forEach(item => {
+                        const option = document.createElement("option");
+                        option.value = `[${String(item.id).padStart(3, "0")}] ${item.name}`;
+                        option.id = item.name;
+                        dataList.appendChild(option);
+                    });
+                })
+                .then(() => {
+                    document.getElementById("digimon-choice-1")
+                })
+                .catch(err => console.log(`Error fetching data: ${err}`));
+
+
+            // 검색 클릭 시
+            document.getElementById("digimon-submit").addEventListener("click", function() {
+                // 디지몬 값
+                const digimonName1 = document.getElementById("digimon-choice-1").value.split("]")[1].trim();
+                const digimonName2 = document.getElementById("digimon-choice-2").value.split("]")[1].trim();
+
+                // 에이전트 레벨
+                const agentLevel = document.getElementById("agent-level-select").value;
+
+                // 최단 경로
+                const digimonPath = findPath(digimonList, digimonName1, digimonName2, agentLevel);
+
+                document.getElementById("digimon-path").text = digimonPath.join(" -> ");
+            })
+
+            // 초기화 클릭 시
+            document.getElementById("digimon-reset").addEventListener("click", function() {
+                document.getElementById("agent-level-select")[9].selected = true;
+                document.getElementById("digimon-choice-1").value = null;
+                document.getElementById("digimon-choice-2").value = null;
+                document.getElementById("digimon-path").text = "";
+            });
+        });
+
+        // 짧 경로
+        function findPath(data, startName, endName, agentLevel) {
+            const levelExceptions = {
+                "루체몬": 5,
+                "아이기오몬": 9,
+                "아이기오투스몬": 9,
+                "아이기오투스몬 그린": 9,
+                "아이기오투스몬 다크": 9,
+                "아이기오투스몬 블루": 9,
+                "아이기오투스몬 홀리": 9,
+                "루체몬 폴다운 모드": 7,
+                "크로노몬": 10,
+                "유피테르몬": 9,
+                "크로노몬 디스트로이 모드": 10,
+                "유피테르몬 래스 모드": 9,
+                "잠수몬": 3,
+                "수리몬": 3,
+                "디그몬": 3,
+                "네페르티몬": 3,
+                "화염드라몬": 3,
+                "페가수스몬": 3,
+                "호루스몬": 3,
+                "번개드라몬": 3,
+                "번개드라몬": 3,
+                "아그니몬": 3,
+                "볼프몬": 3,
+                "라나몬": 3,
+                "브리트라몬": 3,
+                "가룸몬": 3,
+                "래피드몬 (아머체)": 7,
+                "매그너몬": 7,
+                "카이젤그레이몬": 7,
+                "매그너가루몬": 7,
+                "매그너가루몬: 분리:": 7
+            };
+
+            const levelRequirements = {
+                "유아기": 1,
+                "유년기": 1,
+                "성장기": 1,
+                "아머체": 3,
+                "성숙기": 3,
+                "완전체": 5,
+                "하이브리드체": 5,
+                "궁극체": 7,
+                "초궁극체": 8
+            }
+
+            const digimonInfoMap = new Map();
+            data.forEach(d => digimonInfoMap.set(d.name, { level: d.level }));
+
+            const adjList = new Map();
+            data.forEach(d => {
+                if (!adjList.has(d.name)) adjList.set(d.name, new Set());
+                const connections = [...d.after, ...d.before];
+                connections.forEach(conn => {
+                    adjList.get(d.name).add(conn);
+                    if (!adjList.has(conn)) adjList.set(conn, new Set());
+                    adjList.get(conn).add(d.name);
+                });
+            });
+            
+            const queue = [[startName]];
+            const visited = new Set([startName]);
+
+            while (queue.length > 0) {
+                const path = queue.shift();
+                const currentDigimon = path[path.length - 1];
+
+                if (currentDigimon === endName) return path;
+
+                const neighbors = adjList.get(currentDigimon) || [];
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        const neighborInfo = digimonInfoMap.get(neighbor);
+                        if (!neighborInfo) continue;
+
+                        let requiredLevel;
+
+                        if (levelExceptions.hasOwnProperty(neighbor)) {
+                            requiredLevel = levelExceptions[neighbor];
+                        } else {
+                            requiredLevel = levelRequirements[neighborInfo.level] || 1; // 기본값 1
+                        }
+
+                        if (agentLevel >= requiredLevel) {
+                            visited.add(neighbor);
+                            const newPath = [...path, neighbor];
+                            queue.push(newPath);
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+    </script>
+</body>
+</html>
